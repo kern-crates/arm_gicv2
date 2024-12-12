@@ -4,6 +4,7 @@
 
 use core::ptr::NonNull;
 
+use crate::regs::{GicdSgirReg, GICD_SGIR};
 use crate::{TriggerMode, GIC_MAX_IRQ, SPI_RANGE};
 use tock_registers::interfaces::{Readable, Writeable};
 use tock_registers::register_structs;
@@ -42,7 +43,7 @@ register_structs! {
         (0x0c00 => ICFGR: [ReadWrite<u32>; 0x40]),
         (0x0d00 => _reserved_1),
         /// Software Generated Interrupt Register.
-        (0x0f00 => SGIR: WriteOnly<u32>),
+        (0x0f00 => SGIR: GicdSgirReg),
         (0x0f04 => @END),
     }
 }
@@ -175,6 +176,29 @@ impl GicDistributor {
         } else {
             self.regs().ICENABLER[reg].set(mask);
         }
+    }
+    /// Send ipi to processor specified by `dest_cpu_id`.
+    pub fn send_sgi(&mut self, dest_cpu_id: usize, sgi_num: usize) {
+        self.regs().SGIR.write(
+            GICD_SGIR::TargetListFilter::ForwardToCPUTargetList
+                + GICD_SGIR::CPUTargetList.val(dest_cpu_id as _)
+                + GICD_SGIR::SGIINTID.val(sgi_num as _),
+        );
+    }
+
+    /// Sends an IPI to every processor, excluding the current one.
+    pub fn send_sgi_all_except_self(&mut self, sgi_num: usize) {
+        self.regs().SGIR.write(
+            GICD_SGIR::TargetListFilter::ForwardToAllExceptRequester
+                + GICD_SGIR::SGIINTID.val(sgi_num as _),
+        );
+    }
+
+    /// Sends an IPI to the current processor.
+    pub fn send_sgi_to_self(&mut self, sgi_num: usize) {
+        self.regs().SGIR.write(
+            GICD_SGIR::TargetListFilter::ForwardToRequester + GICD_SGIR::SGIINTID.val(sgi_num as _),
+        );
     }
 
     /// Initializes the GIC distributor.
