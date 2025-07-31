@@ -177,11 +177,14 @@ impl GicDistributor {
             self.regs().ICENABLER[reg].set(mask);
         }
     }
+
     /// Send ipi to processor specified by `dest_cpu_id`.
     pub fn send_sgi(&mut self, dest_cpu_id: usize, sgi_num: usize) {
+        let cpu_mask = 1u8 << dest_cpu_id;
+
         self.regs().SGIR.write(
             GICD_SGIR::TargetListFilter::ForwardToCPUTargetList
-                + GICD_SGIR::CPUTargetList.val(dest_cpu_id as _)
+                + GICD_SGIR::CPUTargetList.val(cpu_mask as _)
                 + GICD_SGIR::SGIINTID.val(sgi_num as _),
         );
     }
@@ -195,7 +198,7 @@ impl GicDistributor {
     }
 
     /// Sends an IPI to the current processor.
-    pub fn send_sgi_to_self(&mut self, sgi_num: usize) {
+    pub fn send_sgi_self(&mut self, sgi_num: usize) {
         self.regs().SGIR.write(
             GICD_SGIR::TargetListFilter::ForwardToRequester + GICD_SGIR::SGIINTID.val(sgi_num as _),
         );
